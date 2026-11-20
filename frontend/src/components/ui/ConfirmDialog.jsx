@@ -1,13 +1,42 @@
+import { AlertTriangle } from 'lucide-react';
 import Modal from './Modal';
 import Button from './Button';
-export default function ConfirmDialog({ open, onClose, onConfirm, title = 'Confirm action', description, confirmText = 'Confirm', danger = true, loading }) {
+
+/**
+ * Confirm dialog for delete / cancel / mark absentees.
+ *   tone: 'danger' (red button) or 'primary'
+ */
+export default function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title = 'Are you sure?',
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  tone = 'danger',
+  loading = false,
+  icon = AlertTriangle,
+}) {
   return (
-    <Modal open={open} onClose={onClose} title={title} width={420}>
-      <p className="confirm-copy">{description}</p>
-      <div className="modal-actions">
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>{confirmText}</Button>
-      </div>
+    <Modal
+      open={open}
+      onClose={loading ? () => {} : onClose}
+      title={title}
+      icon={icon}
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            {cancelText}
+          </Button>
+          <Button variant={tone === 'danger' ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
+            {confirmText}
+          </Button>
+        </>
+      }
+    >
+      <div className="confirm-body">{typeof message === 'string' ? <p>{message}</p> : message}</div>
     </Modal>
   );
 }

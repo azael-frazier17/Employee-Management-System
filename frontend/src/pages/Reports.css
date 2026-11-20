@@ -1,0 +1,32 @@
+.report-print-header {
+  border-bottom: 2px solid #111827;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.report-print-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.report-print-top h2 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4b5563;
+}
+
+.report-print-top h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.report-print-meta {
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.6;
+}

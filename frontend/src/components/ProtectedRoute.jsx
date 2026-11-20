@@ -1,14 +1,30 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useAuth from '../hooks/useAuth';
 
-export default function ProtectedRoute({ roles }) {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="brand-loader">Loading EMS...</div>;
-  if (!user) return <Navigate to="/login" replace />;
+/** Shows a toast once, then redirects (toasts must not be fired during render). */
+function RedirectWithToast({ to, message }) {
+  useEffect(() => {
+    toast.error(message, { id: 'wrong-role' });
+  }, [message]);
+  return <Navigate to={to} replace />;
+}
+
+/**
+ * Guards a route.
+ *  - not logged in   -> /login
+ *  - wrong role      -> / with a toast
+ */
+export default function ProtectedRoute({ roles, children }) {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+
   if (roles && !roles.includes(user.role)) {
-    toast.error('You do not have permission to access that page.');
-    return <Navigate to="/" replace />;
+    return <RedirectWithToast to="/" message="You do not have access to that page." />;
   }
-  return <Outlet />;
+
+  return children || <Outlet />;
 }

@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
+import { Toaster } from 'react-hot-toast';
 import useAuth from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
-import Sidebar from './components/Sidebar';
-import Navbar from './components/Navbar';
+import Layout from './components/Layout';
+import FullScreenLoader from './components/ui/FullScreenLoader';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
@@ -15,44 +15,58 @@ import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import NotFound from './pages/NotFound';
 
-const titles = {
-  '/':'Dashboard','/employees':'Employees','/departments':'Departments & Positions',
-  '/attendance':'Attendance','/leaves':'Leave Requests','/profile':'My Profile','/reports':'Reports',
-};
-
-function Shell() {
-  const [collapsed,setCollapsed] = useState(false);
-  const [mobileOpen,setMobileOpen] = useState(false);
-  const location = useLocation();
-  useEffect(() => setMobileOpen(false), [location.pathname]);
-  const title = titles[location.pathname] || 'EMS';
-  return (
-    <div className="app-shell">
-      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} mobileOpen={mobileOpen}/>
-      <div className={`main-shell ${collapsed ? 'collapsed' : ''}`}>
-        <Navbar title={title} onMenu={() => setMobileOpen(!mobileOpen)}/>
-        <AnimatePresence mode="wait"><Routes location={location} key={location.pathname}>
-          <Route path="/" element={<Dashboard/>}/>
-          <Route path="*" element={<NotFound/>}/>
-          <Route path="/employees" element={<ProtectedRoute roles={['Admin']}/>}><Route index element={<Employees/>}/></Route>
-          <Route path="/departments" element={<ProtectedRoute roles={['Admin']}/>}><Route index element={<Departments/>}/></Route>
-          <Route path="/attendance" element={<Attendance/>}/>
-          <Route path="/leaves" element={<Leaves/>}/>
-          <Route path="/profile" element={<Profile/>}/>
-          <Route path="/reports" element={<ProtectedRoute roles={['Admin']}/>}><Route index element={<Reports/>}/></Route>
-        </Routes></AnimatePresence>
-      </div>
-    </div>
-  );
-}
+const ADMIN = ['Admin'];
 
 export default function App() {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="login-page"><div className="login-side"><div className="brand-mark" style={{width:56,height:56}}/><h2 style={{marginTop:14}}>Loading EMS...</h2></div></div>;
+  const { user, ready } = useAuth();
+
+  // While the saved token is being checked (GET /auth/me) show the branded loader
+  if (!ready) return <FullScreenLoader />;
+
   return (
-    <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace/> : <Login/>}/>
-      <Route element={<ProtectedRoute/>}><Route path="/*" element={<Shell/>}/></Route>
-    </Routes>
+    // reducedMotion="user": framer-motion respects prefers-reduced-motion
+    <MotionConfig reducedMotion="user">
+      <Toaster
+        position="top-right"
+        gutter={10}
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
+            borderRadius: '14px',
+            boxShadow: 'var(--shadow-lg)',
+            fontSize: '13.5px',
+            padding: '10px 14px',
+          },
+          success: { iconTheme: { primary: '#10B981', secondary: '#fff' } },
+          error: { iconTheme: { primary: '#F43F5E', secondary: '#fff' } },
+        }}
+      />
+
+      <Routes>
+        {/* Public */}
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+
+        {/* Logged-in area (both roles) */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="employees" element={<ProtectedRoute roles={ADMIN}><Employees /></ProtectedRoute>} />
+          <Route path="departments" element={<ProtectedRoute roles={ADMIN}><Departments /></ProtectedRoute>} />
+          <Route path="attendance" element={<Attendance />} />
+          <Route path="leaves" element={<Leaves />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="reports" element={<ProtectedRoute roles={ADMIN}><Reports /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </MotionConfig>
   );
 }

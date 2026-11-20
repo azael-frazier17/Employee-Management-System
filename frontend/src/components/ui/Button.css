@@ -1,0 +1,134 @@
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+  transition: transform var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease),
+    background-position 0.5s var(--ease), background-color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), opacity var(--t-fast);
+}
+
+.btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+.btn-md {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13.5px;
+}
+
+.btn-lg {
+  height: 48px;
+  padding: 0 22px;
+  font-size: 15px;
+  border-radius: var(--r-md);
+}
+
+.btn-full {
+  width: 100%;
+}
+
+/* Hover lifts, press scales to .97 */
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 80ms;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Primary: gradient that shifts on hover */
+.btn-primary {
+  color: #fff;
+  background-image: linear-gradient(120deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%);
+  background-size: 200% 100%;
+  background-position: 0% 0%;
+  box-shadow: 0 6px 16px -4px rgba(99, 102, 241, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-position: 100% 0%;
+  box-shadow: var(--shadow-primary), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme='light'] .btn-secondary {
+  background: var(--surface);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.btn-danger {
+  color: #fff;
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  box-shadow: 0 4px 12px -4px rgba(244, 63, 94, 0.5);
+}
+
+.btn-danger:hover:not(:disabled) {
+  box-shadow: 0 10px 22px -8px rgba(244, 63, 94, 0.6);
+}
+
+.btn-success {
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 4px 12px -4px rgba(16, 185, 129, 0.5);
+}
+
+.btn-success:hover:not(:disabled) {
+  box-shadow: 0 10px 22px -8px rgba(16, 185, 129, 0.6);
+}
+
+/* Soft variants for inline approve / reject */
+.btn-soft-success {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.13);
+  border-color: rgba(16, 185, 129, 0.24);
+}
+
+.btn-soft-success:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.22);
+}
+
+.btn-soft-danger {
+  color: var(--danger);
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.24);
+}
+
+.btn-soft-danger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.2);
+}

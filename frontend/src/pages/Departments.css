@@ -1,0 +1,145 @@
+.dept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.dept-card {
+  overflow: hidden;
+}
+
+.dept-card.expanded {
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: var(--shadow-md);
+}
+
+.dept-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 20px 14px;
+  cursor: pointer;
+}
+
+.dept-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: var(--primary-soft);
+  flex-shrink: 0;
+  transition: transform var(--t-med) var(--ease), background var(--t-med) var(--ease),
+    color var(--t-med) var(--ease);
+}
+
+.dept-card:hover .dept-icon,
+.dept-card.expanded .dept-icon {
+  background: var(--gradient);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.dept-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dept-info h3 {
+  font-size: 16.5px;
+  font-weight: 700;
+}
+
+.dept-info p {
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dept-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.dept-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 16px;
+  cursor: pointer;
+}
+
+.dept-expand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.dept-positions {
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.dept-positions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.dept-pos-empty {
+  padding: 18px 20px;
+  text-align: center;
+}
+
+.dept-pos-list {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 14px 12px;
+}
+
+.dept-pos-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 10px;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.dept-pos-item:hover {
+  background: var(--hover);
+}
+
+.dept-pos-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dept-pos-main strong {
+  font-size: 13.5px;
+}
+
+@media (max-width: 500px) {
+  .dept-grid {
+    grid-template-columns: 1fr;
+  }
+}

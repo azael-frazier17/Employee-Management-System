@@ -1,83 +1,861 @@
-import { useEffect, useState } from 'react';
-import { Plus, CalendarCheck, Pencil, Trash2, Clock3 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import api from '../api/axios';
+import {
+  CalendarClock,
+  Clock,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Save,
+  Trash2,
+  UserCheck,
+  UserMinus,
+  UserX,
+} from 'lucide-react';
+import api, { getErrorMessage } from '../api/axios';
 import useAuth from '../hooks/useAuth';
-import { formatDate,formatTime,getErrorMessage,toDateInput,monthRange } from '../utils/helpers';
-import PageTransition from '../components/ui/PageTransition';
+import useDebounce from '../hooks/useDebounce';
+import { ATTENDANCE_STATUSES, PAGE_SIZE } from '../utils/constants';
+import {
+  cleanParams,
+  formatDate,
+  formatHours,
+  formatTime,
+  monthRange,
+  presetRange,
+  todayStr,
+} from '../utils/helpers';
+import { fadeUp, stagger } from '../utils/motion';
 import PageHeader from '../components/ui/PageHeader';
+import SearchInput from '../components/ui/SearchInput';
 import Button from '../components/ui/Button';
-import StatusBadge from '../components/ui/StatusBadge';
-import Pagination from '../components/ui/Pagination';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import EmptyState from '../components/ui/EmptyState';
-import { Skeleton } from '../components/ui/Skeleton';
+import Pagination from '../components/ui/Pagination';
+import Avatar from '../components/ui/Avatar';
+import StatusBadge from '../components/ui/StatusBadge';
+import Field from '../components/ui/Field';
+import { SkeletonTable } from '../components/ui/Skeleton';
+import EmptyState, { ErrorState } from '../components/ui/EmptyState';
+import TimeCard from '../components/TimeCard';
 
-export default function Attendance(){
-  const {isAdmin}=useAuth();
-  return isAdmin?<AdminAttendance/>:<EmployeeAttendance/>;
+/* =========================================================================
+   EMPLOYEE ATTENDANCE VIEW
+   ========================================================================= */
+function EmployeeAttendance() {
+  const defaultMonth = monthRange();
+  const [status, setStatus] = useState('');
+  const [from, setFrom] = useState(defaultMonth.from);
+  const [to, setTo] = useState(defaultMonth.to);
+  const [page, setPage] = useState(1);
+
+  const [records, setRecords] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [monthCounts, setMonthCounts] = useState({ Present: 0, Late: 0, Absent: 0 });
+
+  const loadMonthSummary = useCallback(async () => {
+    try {
+      const m = monthRange();
+      const res = await api.get('/attendance/my', {
+        params: { from: m.from, to: m.to, limit: 100 },
+      });
+      const rows = res.data.data || [];
+      const counts = rows.reduce(
+        (acc, r) => {
+          acc[r.status] = (acc[r.status] || 0) + 1;
+          return acc;
+        },
+        { Present: 0, Late: 0, Absent: 0 }
+      );
+      setMonthCounts(counts);
+    } catch {
+      // summary is secondary
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = cleanParams({ status, from, to, page, limit: PAGE_SIZE });
+      const res = await api.get('/attendance/my', { params });
+      setRecords(res.data.data || []);
+      setPagination(res.data.pagination || null);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [status, from, to, page]);
+
+  useEffect(() => {
+    loadMonthSummary();
+  }, [loadMonthSummary]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [status, from, to]);
+
+  const applyPreset = (p) => {
+    const r = presetRange(p);
+    setFrom(r.from);
+    setTo(r.to);
+  };
+
+  return (
+    <div className="stack">
+      <PageHeader
+        icon={CalendarClock}
+        title="My Attendance"
+        subtitle="Clock in and out for today and review your daily attendance history."
+      />
+
+      <TimeCard
+        onChange={() => {
+          loadHistory();
+          loadMonthSummary();
+        }}
+      />
+
+      <div className="row-wrap">
+        <div className="summary-chip">
+          <span className="dot-icon tone-success">
+            <UserCheck size={18} />
+          </span>
+          <div>
+            <strong>{monthCounts.Present}</strong>
+            <span>Present this month</span>
+          </div>
+        </div>
+        <div className="summary-chip">
+          <span className="dot-icon tone-warning">
+            <Clock size={18} />
+          </span>
+          <div>
+            <strong>{monthCounts.Late}</strong>
+            <span>Late this month</span>
+          </div>
+        </div>
+        <div className="summary-chip">
+          <span className="dot-icon tone-danger">
+            <UserX size={18} />
+          </span>
+          <div>
+            <strong>{monthCounts.Absent}</strong>
+            <span>Absent this month</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="toolbar">
+          <select
+            className="select"
+            aria-label="Filter by status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            {ATTENDANCE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            className="input"
+            aria-label="From date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+          <span className="muted small">to</span>
+          <input
+            type="date"
+            className="input"
+            aria-label="To date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
+
+          <div className="row-wrap" style={{ gap: 6 }}>
+            <button type="button" className="chip" onClick={() => applyPreset('today')}>
+              Today
+            </button>
+            <button type="button" className="chip" onClick={() => applyPreset('week')}>
+              This week
+            </button>
+            <button type="button" className="chip" onClick={() => applyPreset('month')}>
+              This month
+            </button>
+          </div>
+        </div>
+
+        {error ? (
+          <ErrorState message={error} onRetry={loadHistory} />
+        ) : loading ? (
+          <SkeletonTable rows={6} cols={5} />
+        ) : records.length === 0 ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="No attendance records found"
+            message="Try adjusting the date range or status filter."
+          />
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Time in</th>
+                    <th>Time out</th>
+                    <th>Hours worked</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                  </tr>
+                </thead>
+                <motion.tbody variants={stagger} initial="hidden" animate="show">
+                  {records.map((r) => (
+                    <motion.tr key={r.id} variants={fadeUp}>
+                      <td className="num">
+                        <strong>{formatDate(r.attendance_date)}</strong>
+                      </td>
+                      <td className="num">{formatTime(r.time_in)}</td>
+                      <td className="num">{formatTime(r.time_out)}</td>
+                      <td className="num">{formatHours(r.hours_worked)}</td>
+                      <td>
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="wrap muted">{r.remarks || '—'}</td>
+                    </motion.tr>
+                  ))}
+                </motion.tbody>
+              </table>
+            </div>
+            <Pagination pagination={pagination} onChange={setPage} />
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function EmployeeAttendance(){
-  const [today,setToday]=useState(null);const [rows,setRows]=useState([]);const [pagination,setPagination]=useState(null);const [page,setPage]=useState(1);const [status,setStatus]=useState('');const [from,setFrom]=useState('');const [to,setTo]=useState('');const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [now,setNow]=useState(new Date());
-  useEffect(()=>{const t=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(t);},[]);
-  const load=async()=>{
-    setLoading(true);setError('');
-    try{const [t,h]=await Promise.all([api.get('/attendance/today'),api.get('/attendance/my',{params:{status:status||undefined,from:from||undefined,to:to||undefined,page,limit:20}})]);setToday(t.data.data?.record||null);setRows(h.data.data||[]);setPagination(h.data.pagination||null);}catch(err){setError(getErrorMessage(err));}finally{setLoading(false);}
-  };
-  useEffect(()=>{load();},[status,from,to,page]);
-  const clock=async(action)=>{
-    try{const r=await api.post(`/attendance/${action}`);toast.success(r.data.message);load();}catch(err){toast.error(getErrorMessage(err));}
-  };
-  const range=monthRange();const monthRows=rows.filter(r=>r.attendance_date>=range.from&&r.attendance_date<=range.to);const counts={Present:0,Late:0,Absent:0};monthRows.forEach(r=>counts[r.status]=(counts[r.status]||0)+1);
-  if(error)return <PageTransition><EmptyState title="Could not load attendance" description={error} actionLabel="Retry" onAction={load}/></PageTransition>;
-  return <PageTransition>
-    <PageHeader title="My Attendance"/>
-    <div className="card time-card"><div className="live-time">{now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div><div className="live-date">{now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div><div className={`time-ring ${today&&!today.time_out?'available':''}`}><Button size="lg" onClick={()=>clock(!today?.time_in?'time-in':'time-out')} disabled={Boolean(today?.time_in&&today?.time_out)}>{!today?.time_in?'Time In':!today?.time_out?'Time Out':'Done for today'}</Button></div>{today&&<div>{today.time_in&&`Time in ${formatTime(today.time_in)} · `}{today.time_out&&`Time out ${formatTime(today.time_out)} · `}<StatusBadge status={today.status}/>{today.status==='Late'&&<span style={{display:'block',fontSize:11,color:'var(--warning)',marginTop:7}}>You were marked Late.</span>}</div>}</div>
-    <div className="summary-strip" style={{marginTop:16}}><div className="summary-chip"><span>Present this month</span><strong>{counts.Present}</strong></div><div className="summary-chip"><span>Late this month</span><strong>{counts.Late}</strong></div><div className="summary-chip"><span>Absent this month</span><strong>{counts.Absent}</strong></div></div>
-    <div className="toolbar"><div className="toolbar-left"><select className="search-input" value={status} onChange={e=>setStatus(e.target.value)}><option value="">All statuses</option><option>Present</option><option>Late</option><option>Absent</option></select><input className="search-input" type="date" aria-label="From date" value={from} onChange={e=>setFrom(e.target.value)}/><input className="search-input" type="date" aria-label="To date" value={to} onChange={e=>setTo(e.target.value)}/></div></div>
-    {loading?<Skeleton rows={5} type="table"/>:rows.length?<><div className="table-wrap"><table className="table"><thead><tr><th>Date</th><th>Time in</th><th>Time out</th><th>Hours</th><th>Status</th><th>Remarks</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{formatDate(r.attendance_date)}</td><td>{formatTime(r.time_in)}</td><td>{formatTime(r.time_out)}</td><td>{r.hours_worked||'-'}</td><td><StatusBadge status={r.status}/></td><td>{r.remarks||'-'}</td></tr>)}</tbody></table></div><Pagination pagination={pagination} page={page} onPageChange={setPage}/></>:<EmptyState title="No attendance records"/>}
-  </PageTransition>;
-}
+/* =========================================================================
+   ADMIN ATTENDANCE VIEW
+   ========================================================================= */
+const emptyManual = () => ({
+  employee_id: '',
+  attendance_date: todayStr(),
+  time_in: '08:55',
+  time_out: '17:30',
+  status: '',
+  remarks: '',
+});
 
-function AdminAttendance(){
-  const [rows,setRows]=useState([]);const [pagination,setPagination]=useState(null);const [page,setPage]=useState(1);const [search,setSearch]=useState('');const [department,setDepartment]=useState('');const [status,setStatus]=useState('');const [from,setFrom]=useState('');const [to,setTo]=useState('');const [departments,setDepartments]=useState([]);const [employees,setEmployees]=useState([]);const [summary,setSummary]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
-  const [modal,setModal]=useState(false);const [editing,setEditing]=useState(null);const [form,setForm]=useState({employee_id:'',attendance_date:toDateInput(),time_in:'',time_out:'',status:'Present',remarks:''});const [deleteTarget,setDeleteTarget]=useState(null);const [markOpen,setMarkOpen]=useState(false);const [markDate,setMarkDate]=useState(toDateInput());
-  const load=async()=>{
-    setLoading(true);setError('');
-    try{const [r,s]=await Promise.all([api.get('/attendance',{params:{search:search||undefined,department_id:department||undefined,status:status||undefined,from:from||undefined,to:to||undefined,page,limit:20}}),api.get('/attendance/reports/summary',{params:{from:from||undefined,to:to||undefined,department_id:department||undefined}})]);setRows(r.data.data||[]);setPagination(r.data.pagination||null);setSummary(s.data.data);}
-    catch(err){setError(getErrorMessage(err));}finally{setLoading(false);}
+function AdminAttendance({ user }) {
+  const defaultMonth = monthRange();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 350);
+  const [departmentId, setDepartmentId] = useState('');
+  const [status, setStatus] = useState('');
+  const [from, setFrom] = useState(defaultMonth.from);
+  const [to, setTo] = useState(defaultMonth.to);
+  const [preset, setPreset] = useState('month');
+  const [page, setPage] = useState(1);
+
+  const [departments, setDepartments] = useState([]);
+  const [employeeOptions, setEmployeeOptions] = useState([]);
+
+  const [records, setRecords] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [summaryTotals, setSummaryTotals] = useState({
+    present_days: 0,
+    late_days: 0,
+    absent_days: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyManual);
+  const [formErrors, setFormErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const [absentOpen, setAbsentOpen] = useState(false);
+  const [absentDate, setAbsentDate] = useState(todayStr());
+  const [markingAbsent, setMarkingAbsent] = useState(false);
+
+  const [deleting, setDeleting] = useState(null);
+  const [busyDelete, setBusyDelete] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/departments'),
+      api.get('/employees', { params: { status: 'Active', limit: 100, sort: 'name' } }),
+    ])
+      .then(([dRes, eRes]) => {
+        setDepartments(dRes.data.data || []);
+        setEmployeeOptions(eRes.data.data || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const listParams = cleanParams({
+        search: debouncedSearch,
+        department_id: departmentId,
+        status,
+        from,
+        to,
+        page,
+        limit: PAGE_SIZE,
+      });
+      const summaryParams = cleanParams({
+        department_id: departmentId,
+        from,
+        to,
+      });
+      const [listRes, sumRes] = await Promise.all([
+        api.get('/attendance', { params: listParams }),
+        api.get('/attendance/reports/summary', { params: summaryParams }),
+      ]);
+      setRecords(listRes.data.data || []);
+      setPagination(listRes.data.pagination || null);
+      setSummaryTotals(
+        sumRes.data.data?.totals || { present_days: 0, late_days: 0, absent_days: 0 }
+      );
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, departmentId, status, from, to, page]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, departmentId, status, from, to]);
+
+  const applyPreset = (p) => {
+    const r = presetRange(p);
+    setPreset(p);
+    setFrom(r.from);
+    setTo(r.to);
   };
-  useEffect(()=>{load();},[search,department,status,from,to,page]);
-  useEffect(()=>{Promise.all([api.get('/departments'),api.get('/employees',{params:{limit:100}})]).then(([d,e])=>{setDepartments(d.data.data||[]);setEmployees(e.data.data||[]);}).catch(()=>{});},[]);
-  const preset=(kind)=>{
-    const now=new Date();const end=toDateInput(now);
-    if(kind==='today')setFrom(end),setTo(end);
-    if(kind==='week'){const start=new Date(now);start.setDate(now.getDate()-now.getDay());setFrom(toDateInput(start));setTo(end);}
-    if(kind==='month'){const start=new Date(now.getFullYear(),now.getMonth(),1);setFrom(toDateInput(start));setTo(end);}
+
+  const openAddModal = () => {
+    setEditing(null);
+    setForm({
+      ...emptyManual(),
+      employee_id: employeeOptions[0]?.id ? String(employeeOptions[0].id) : '',
+    });
+    setFormErrors({});
+    setModalOpen(true);
   };
-  const openAdd=()=>{setEditing(null);setForm({employee_id:'',attendance_date:toDateInput(),time_in:'',time_out:'',status:'Present',remarks:''});setModal(true);}
-  const openEdit=row=>{setEditing(row);setForm({employee_id:row.employee_id,attendance_date:row.attendance_date?.slice(0,10),time_in:row.time_in||'',time_out:row.time_out||'',status:row.status,remarks:row.remarks||''});setModal(true);}
-  const save=async(e)=>{
+
+  const openEditModal = (rec) => {
+    setEditing(rec);
+    setForm({
+      employee_id: String(rec.employee_id),
+      attendance_date: rec.attendance_date,
+      time_in: rec.time_in ? rec.time_in.slice(0, 5) : '',
+      time_out: rec.time_out ? rec.time_out.slice(0, 5) : '',
+      status: rec.status || '',
+      remarks: rec.remarks || '',
+    });
+    setFormErrors({});
+    setModalOpen(true);
+  };
+
+  const handleSaveRecord = async (e) => {
     e.preventDefault();
-    try{const payload={...form,employee_id:Number(form.employee_id)};const r=editing?await api.put(`/attendance/${editing.id}`,payload):await api.post('/attendance',payload);toast.success(r.data.message);setModal(false);load();}catch(err){toast.error(getErrorMessage(err));}
+    const errs = {};
+    if (!editing && !form.employee_id) errs.employee_id = 'Select an employee.';
+    if (!editing && !form.attendance_date) errs.attendance_date = 'Date is required.';
+    if (form.time_in && form.time_out && form.time_out < form.time_in) {
+      errs.time_out = 'Time out cannot be earlier than time in.';
+    }
+    setFormErrors(errs);
+    if (Object.keys(errs).length) return;
+
+    setSaving(true);
+    try {
+      if (editing) {
+        const res = await api.put(`/attendance/${editing.id}`, {
+          time_in: form.time_in || null,
+          time_out: form.time_out || null,
+          status: form.status || undefined,
+          remarks: form.remarks.trim() || null,
+        });
+        toast.success(res.data.message || 'Attendance updated.');
+      } else {
+        const res = await api.post('/attendance', {
+          employee_id: Number(form.employee_id),
+          attendance_date: form.attendance_date,
+          time_in: form.time_in || null,
+          time_out: form.time_out || null,
+          status: form.status || undefined,
+          remarks: form.remarks.trim() || null,
+        });
+        toast.success(res.data.message || 'Attendance saved.');
+      }
+      setModalOpen(false);
+      loadData();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
   };
-  const remove=async()=>{try{const r=await api.delete(`/attendance/${deleteTarget.id}`);toast.success(r.data.message);setDeleteTarget(null);load();}catch(err){toast.error(getErrorMessage(err));}};
-  const mark=async()=>{try{const r=await api.post('/attendance/mark-absent',{date:markDate,department_id:department||undefined});toast.success(r.data.message);setMarkOpen(false);load();}catch(err){toast.error(getErrorMessage(err));}};
-  if(error)return <PageTransition><EmptyState title="Could not load attendance" description={error} actionLabel="Retry" onAction={load}/></PageTransition>;
-  const totals=summary?.totals||{};
-  return <PageTransition>
-    <PageHeader title="Attendance" description="Monitor employee attendance and manual records." actions={<><Button variant="secondary" icon={CalendarCheck} onClick={()=>setMarkOpen(true)}>Mark absentees</Button><Button icon={Plus} onClick={openAdd}>Add record</Button></>}/>
-    <div className="summary-strip"><div className="summary-chip"><span>Present</span><strong>{totals.present_days||0}</strong></div><div className="summary-chip"><span>Late</span><strong>{totals.late_days||0}</strong></div><div className="summary-chip"><span>Absent</span><strong>{totals.absent_days||0}</strong></div></div>
-    <div className="toolbar"><div className="toolbar-left"><input className="search-input" placeholder="Search employee" value={search} onChange={e=>setSearch(e.target.value)}/><select className="search-input" value={department} onChange={e=>setDepartment(e.target.value)}><option value="">All departments</option>{departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><select className="search-input" value={status} onChange={e=>setStatus(e.target.value)}><option value="">All statuses</option><option>Present</option><option>Late</option><option>Absent</option></select><input className="search-input" type="date" value={from} onChange={e=>setFrom(e.target.value)} aria-label="From"/><input className="search-input" type="date" value={to} onChange={e=>setTo(e.target.value)} aria-label="To"/></div><div className="toolbar-right"><Button size="sm" variant="secondary" onClick={()=>preset('today')}>Today</Button><Button size="sm" variant="secondary" onClick={()=>preset('week')}>This week</Button><Button size="sm" variant="secondary" onClick={()=>preset('month')}>This month</Button></div></div>
-    {loading?<Skeleton rows={6} type="table"/>:rows.length?<><div className="table-wrap"><table className="table"><thead><tr><th>Employee</th><th>Department</th><th>Date</th><th>Time in</th><th>Time out</th><th>Hours</th><th>Status</th><th>Remarks</th><th></th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.employee_name}</td><td>{r.department_name||'-'}</td><td>{formatDate(r.attendance_date)}</td><td>{formatTime(r.time_in)}</td><td>{formatTime(r.time_out)}</td><td>{r.hours_worked||'-'}</td><td><StatusBadge status={r.status}/></td><td>{r.remarks||'-'}</td><td><div className="row-actions touch"><button className="icon-button" aria-label="Edit" onClick={()=>openEdit(r)}><Pencil size={15}/></button><button className="icon-button" aria-label="Delete" onClick={()=>setDeleteTarget(r)}><Trash2 size={15}/></button></div></td></tr>)}</tbody></table></div><Pagination pagination={pagination} page={page} onPageChange={setPage}/></>:<EmptyState title="No attendance records"/>}
-    <Modal open={modal} onClose={()=>setModal(false)} title={editing?'Edit attendance':'Add attendance'}><form onSubmit={save}><div className="form-grid"><div className="field span-2"><label>Employee</label><select value={form.employee_id} onChange={e=>setForm(v=>({...v,employee_id:e.target.value}))} required disabled={Boolean(editing)}><option value="">Select employee</option>{employees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></div><div className="field"><label>Date</label><input type="date" value={form.attendance_date} onChange={e=>setForm(v=>({...v,attendance_date:e.target.value}))} disabled={Boolean(editing)} required/></div><div className="field"><label>Status</label><select value={form.status} onChange={e=>setForm(v=>({...v,status:e.target.value}))}><option>Present</option><option>Late</option><option>Absent</option></select></div><div className="field"><label>Time in</label><input type="time" value={form.time_in} onChange={e=>setForm(v=>({...v,time_in:e.target.value}))}/></div><div className="field"><label>Time out</label><input type="time" value={form.time_out} onChange={e=>setForm(v=>({...v,time_out:e.target.value}))}/></div><div className="field span-2"><label>Remarks</label><textarea value={form.remarks} onChange={e=>setForm(v=>({...v,remarks:e.target.value}))}/></div></div><div className="modal-actions"><Button variant="secondary" type="button" onClick={()=>setModal(false)}>Cancel</Button><Button type="submit">{editing?'Save':'Create'}</Button></div></form></Modal>
-    <ConfirmDialog open={Boolean(deleteTarget)} onClose={()=>setDeleteTarget(null)} onConfirm={remove} title="Delete attendance" description="This attendance record will be permanently deleted." confirmText="Delete"/>
-    <Modal open={markOpen} onClose={()=>setMarkOpen(false)} title="Mark absentees" width={420}>
-      <div className="field"><label htmlFor="mark-date">Date</label><input id="mark-date" type="date" max={toDateInput()} value={markDate} onChange={e=>setMarkDate(e.target.value)}/></div>
-      <p className="confirm-copy">Employees without a record for this date will be marked absent.</p>
-      <div className="modal-actions"><Button variant="secondary" onClick={()=>setMarkOpen(false)}>Cancel</Button><Button onClick={mark}>Mark absent</Button></div>
-    </Modal>
-  </PageTransition>;
+
+  const handleMarkAbsentees = async () => {
+    setMarkingAbsent(true);
+    try {
+      const payload = cleanParams({
+        date: absentDate,
+        department_id: departmentId ? Number(departmentId) : undefined,
+      });
+      const res = await api.post('/attendance/mark-absent', payload);
+      toast.success(
+        res.data.message || `${res.data.data?.marked ?? 0} employee(s) marked Absent.`
+      );
+      setAbsentOpen(false);
+      loadData();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setMarkingAbsent(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleting) return;
+    setBusyDelete(true);
+    try {
+      const res = await api.delete(`/attendance/${deleting.id}`);
+      toast.success(res.data.message || 'Attendance record deleted.');
+      setDeleting(null);
+      loadData();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setBusyDelete(false);
+    }
+  };
+
+  return (
+    <div className="stack">
+      <PageHeader
+        icon={CalendarClock}
+        title="Attendance"
+        subtitle="Track daily check-ins, add manual records, and mark daily absentees."
+        actions={
+          <>
+            <Button variant="secondary" icon={UserMinus} onClick={() => setAbsentOpen(true)}>
+              Mark absentees
+            </Button>
+            <Button icon={Plus} onClick={openAddModal}>
+              Add record
+            </Button>
+          </>
+        }
+      />
+
+      {user?.employeeId && <TimeCard compact onChange={loadData} />}
+
+      <div className="row-wrap">
+        <div className="summary-chip">
+          <span className="dot-icon tone-success">
+            <UserCheck size={18} />
+          </span>
+          <div>
+            <strong>{summaryTotals.present_days || 0}</strong>
+            <span>Present (selected range)</span>
+          </div>
+        </div>
+        <div className="summary-chip">
+          <span className="dot-icon tone-warning">
+            <Clock size={18} />
+          </span>
+          <div>
+            <strong>{summaryTotals.late_days || 0}</strong>
+            <span>Late (selected range)</span>
+          </div>
+        </div>
+        <div className="summary-chip">
+          <span className="dot-icon tone-danger">
+            <UserX size={18} />
+          </span>
+          <div>
+            <strong>{summaryTotals.absent_days || 0}</strong>
+            <span>Absent (selected range)</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="toolbar">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search employee name or code…"
+            label="Search attendance"
+          />
+
+          <select
+            className="select"
+            aria-label="Filter by department"
+            value={departmentId}
+            onChange={(e) => setDepartmentId(e.target.value)}
+          >
+            <option value="">All departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="select"
+            aria-label="Filter by status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            {ATTENDANCE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            className="input"
+            aria-label="From date"
+            value={from}
+            onChange={(e) => {
+              setPreset('');
+              setFrom(e.target.value);
+            }}
+          />
+          <input
+            type="date"
+            className="input"
+            aria-label="To date"
+            value={to}
+            onChange={(e) => {
+              setPreset('');
+              setTo(e.target.value);
+            }}
+          />
+
+          <div className="row-wrap" style={{ gap: 6 }}>
+            {[
+              { id: 'today', label: 'Today' },
+              { id: 'week', label: 'This week' },
+              { id: 'month', label: 'This month' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`chip ${preset === p.id ? 'active' : ''}`}
+                onClick={() => applyPreset(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {(search || departmentId || status) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={RotateCcw}
+              onClick={() => {
+                setSearch('');
+                setDepartmentId('');
+                setStatus('');
+              }}
+            >
+              Reset
+            </Button>
+          )}
+        </div>
+
+        {error ? (
+          <ErrorState message={error} onRetry={loadData} />
+        ) : loading ? (
+          <SkeletonTable rows={6} cols={7} />
+        ) : records.length === 0 ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="No attendance logs for this filter"
+            message="Adjust the date range or add a manual attendance record."
+            action={
+              <Button size="sm" icon={Plus} onClick={openAddModal}>
+                Add record
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Department</th>
+                    <th>Date</th>
+                    <th>Time in</th>
+                    <th>Time out</th>
+                    <th>Hours worked</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                    <th className="right">Actions</th>
+                  </tr>
+                </thead>
+                <motion.tbody variants={stagger} initial="hidden" animate="show">
+                  {records.map((r) => (
+                    <motion.tr key={r.id} variants={fadeUp}>
+                      <td>
+                        <div className="person">
+                          <Avatar name={r.employee_name} size={34} />
+                          <div>
+                            <div className="person-name">{r.employee_name}</div>
+                            <div className="person-sub num">{r.employee_code}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{r.department_name || <span className="muted">—</span>}</td>
+                      <td className="num">{formatDate(r.attendance_date)}</td>
+                      <td className="num">{formatTime(r.time_in)}</td>
+                      <td className="num">{formatTime(r.time_out)}</td>
+                      <td className="num">{formatHours(r.hours_worked)}</td>
+                      <td>
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="wrap muted">{r.remarks || '—'}</td>
+                      <td className="right">
+                        <div className="row-actions">
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={() => openEditModal(r)}
+                            aria-label={`Edit attendance for ${r.employee_name}`}
+                            title="Edit record"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-btn danger"
+                            onClick={() => setDeleting(r)}
+                            aria-label={`Delete attendance for ${r.employee_name}`}
+                            title="Delete record"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </motion.tbody>
+              </table>
+            </div>
+            <Pagination pagination={pagination} onChange={setPage} />
+          </>
+        )}
+      </div>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => !saving && setModalOpen(false)}
+        title={editing ? `Edit attendance · ${editing.employee_name}` : 'Add attendance record'}
+        description={
+          editing
+            ? formatDate(editing.attendance_date)
+            : 'Manual entry or overwrite for an employee and date.'
+        }
+        icon={editing ? Pencil : Plus}
+        size="md"
+      >
+        <form className="stack" style={{ gap: 14 }} onSubmit={handleSaveRecord} noValidate>
+          {!editing && (
+            <div className="form-grid">
+              <Field label="Employee" required error={formErrors.employee_id}>
+                {(id, invalid) => (
+                  <select
+                    id={id}
+                    className={`select ${invalid ? 'invalid' : ''}`}
+                    value={form.employee_id}
+                    onChange={(e) => setForm((f) => ({ ...f, employee_id: e.target.value }))}
+                  >
+                    <option value="">Select employee…</option>
+                    {employeeOptions.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.full_name} ({emp.employee_code})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+
+              <Field label="Date" required error={formErrors.attendance_date}>
+                {(id, invalid) => (
+                  <input
+                    id={id}
+                    type="date"
+                    className={`input ${invalid ? 'invalid' : ''}`}
+                    value={form.attendance_date}
+                    onChange={(e) => setForm((f) => ({ ...f, attendance_date: e.target.value }))}
+                  />
+                )}
+              </Field>
+            </div>
+          )}
+
+          <div className="form-grid">
+            <Field label="Time in">
+              {(id) => (
+                <input
+                  id={id}
+                  type="time"
+                  className="input"
+                  value={form.time_in}
+                  onChange={(e) => setForm((f) => ({ ...f, time_in: e.target.value }))}
+                />
+              )}
+            </Field>
+
+            <Field label="Time out" error={formErrors.time_out}>
+              {(id, invalid) => (
+                <input
+                  id={id}
+                  type="time"
+                  className={`input ${invalid ? 'invalid' : ''}`}
+                  value={form.time_out}
+                  onChange={(e) => setForm((f) => ({ ...f, time_out: e.target.value }))}
+                />
+              )}
+            </Field>
+          </div>
+
+          <Field
+            label="Status"
+            hint="Leave on Auto to let the server compute Present / Late from time-in."
+          >
+            {(id) => (
+              <select
+                id={id}
+                className="select"
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              >
+                <option value="">Auto (computed by server)</option>
+                {ATTENDANCE_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+
+          <Field label="Remarks">
+            {(id) => (
+              <input
+                id={id}
+                className="input"
+                value={form.remarks}
+                onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
+                maxLength={255}
+                placeholder="Optional note…"
+              />
+            )}
+          </Field>
+
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" icon={Save} loading={saving}>
+              {editing ? 'Update record' : 'Save record'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={absentOpen}
+        onClose={() => setAbsentOpen(false)}
+        onConfirm={handleMarkAbsentees}
+        loading={markingAbsent}
+        tone="primary"
+        icon={UserMinus}
+        title="Mark absentees"
+        confirmText="Mark Absent"
+        message={
+          <div className="stack" style={{ gap: 12 }}>
+            <p>
+              This marks every active employee who has no attendance record on the selected date
+              (and is not on approved leave) as <strong>Absent</strong>.
+            </p>
+            <Field label="Attendance date">
+              {(id) => (
+                <input
+                  id={id}
+                  type="date"
+                  className="input"
+                  max={todayStr()}
+                  value={absentDate}
+                  onChange={(e) => setAbsentDate(e.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+        }
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onClose={() => setDeleting(null)}
+        onConfirm={handleConfirmDelete}
+        loading={busyDelete}
+        title="Delete attendance record?"
+        confirmText="Delete record"
+        message={
+          deleting && (
+            <p>
+              Delete the attendance log for <strong>{deleting.employee_name}</strong> on{' '}
+              <strong>{formatDate(deleting.attendance_date)}</strong>?
+            </p>
+          )
+        }
+      />
+    </div>
+  );
+}
+
+export default function Attendance() {
+  const { user, isAdmin } = useAuth();
+  return isAdmin ? <AdminAttendance user={user} /> : <EmployeeAttendance />;
 }

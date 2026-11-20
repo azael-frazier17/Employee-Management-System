@@ -1,0 +1,63 @@
+.password-input {
+  position: relative;
+}
+
+.password-input .input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.password-toggle:hover {
+  color: var(--primary);
+  background: var(--hover);
+}
+
+.strength {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.strength-bars {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.strength-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.strength-fill {
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  transition: transform var(--t-slow) var(--ease), background var(--t-slow) var(--ease);
+}
+
+.strength-label {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 64px;
+  text-align: right;
+}
