@@ -1,13 +1,18 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/attendanceController');
-const { authenticate, authorize, requireEmployeeProfile } = require('../middleware/authMiddleware');
+const {
+  authenticate,
+  authorize,
+  requireEmployeeProfile,
+  requireClockInRole,
+} = require('../middleware/authMiddleware');
 
 router.use(authenticate);
 const adminOnly = authorize('Admin');
 
-// Own attendance (needs a linked employee profile)
-router.post('/time-in', requireEmployeeProfile, ctrl.timeIn);
-router.post('/time-out', requireEmployeeProfile, ctrl.timeOut);
+// Own attendance (personal clock-in/out restricted to clock-in roles)
+router.post('/time-in', requireClockInRole, requireEmployeeProfile, ctrl.timeIn);
+router.post('/time-out', requireClockInRole, requireEmployeeProfile, ctrl.timeOut);
 router.get('/today', requireEmployeeProfile, ctrl.today);
 router.get('/my', requireEmployeeProfile, ctrl.myHistory);
 

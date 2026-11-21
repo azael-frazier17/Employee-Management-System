@@ -2,16 +2,13 @@
   min-height: 100vh;
 }
 
+/* Offset for the fixed 64px slim icon rail (overlay drawer floats above content) */
 .app-main {
-  margin-left: var(--sidebar-w);
+  margin-left: 64px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   transition: margin-left var(--t-slow) var(--ease);
-}
-
-.app-shell.is-collapsed .app-main {
-  margin-left: var(--sidebar-w-collapsed);
 }
 
 .app-content {
@@ -23,8 +20,7 @@
 }
 
 @media (max-width: 960px) {
-  .app-main,
-  .app-shell.is-collapsed .app-main {
+  .app-main {
     margin-left: 0;
   }
   .app-content {

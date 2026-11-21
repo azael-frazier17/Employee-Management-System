@@ -57,4 +57,16 @@ const requireEmployeeProfile = (req, res, next) => {
   return next();
 };
 
-module.exports = { authenticate, authorize, requireEmployeeProfile };
+const NON_CLOCK_IN_ROLES = new Set(['admin', 'hr', 'manager']);
+
+/** Rejects admin/management roles from personal clock-in/clock-out endpoints. */
+const requireClockInRole = (req, res, next) => {
+  if (!req.user) return next(new HttpError(401, 'Authentication required.'));
+  const role = String(req.user.role || '').trim().toLowerCase();
+  if (NON_CLOCK_IN_ROLES.has(role)) {
+    return next(new HttpError(403, 'Admins cannot clock in.'));
+  }
+  return next();
+};
+
+module.exports = { authenticate, authorize, requireEmployeeProfile, requireClockInRole };

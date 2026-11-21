@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   CalendarClock,
   Clock,
+  Palmtree,
   Pencil,
   Plus,
   RotateCcw,
@@ -18,10 +19,12 @@ import useAuth from '../hooks/useAuth';
 import useDebounce from '../hooks/useDebounce';
 import { ATTENDANCE_STATUSES, PAGE_SIZE } from '../utils/constants';
 import {
+  canClockIn,
   cleanParams,
   formatDate,
   formatHours,
   formatTime,
+  longToday,
   monthRange,
   presetRange,
   todayStr,
@@ -43,7 +46,7 @@ import TimeCard from '../components/TimeCard';
 /* =========================================================================
    EMPLOYEE ATTENDANCE VIEW
    ========================================================================= */
-function EmployeeAttendance() {
+function EmployeeAttendance({ user }) {
   const defaultMonth = monthRange();
   const [status, setStatus] = useState('');
   const [from, setFrom] = useState(defaultMonth.from);
@@ -118,12 +121,14 @@ function EmployeeAttendance() {
         subtitle="Clock in and out for today and review your daily attendance history."
       />
 
-      <TimeCard
-        onChange={() => {
-          loadHistory();
-          loadMonthSummary();
-        }}
-      />
+      {canClockIn(user?.role) && (
+        <TimeCard
+          onChange={() => {
+            loadHistory();
+            loadMonthSummary();
+          }}
+        />
+      )}
 
       <div className="row-wrap">
         <div className="summary-chip">
@@ -283,6 +288,12 @@ function AdminAttendance({ user }) {
     late_days: 0,
     absent_days: 0,
   });
+  const [todayOverview, setTodayOverview] = useState({
+    present: 0,
+    late: 0,
+    absent: 0,
+    onLeave: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -310,6 +321,30 @@ function AdminAttendance({ user }) {
       })
       .catch(() => {});
   }, []);
+
+  const loadTodayOverview = useCallback(async () => {
+    try {
+      const today = todayStr();
+      const [attRes, leaveRes] = await Promise.all([
+        api.get('/attendance/reports/summary', { params: { from: today, to: today } }),
+        api.get('/leaves/reports/summary', { params: { from: today, to: today } }),
+      ]);
+      const totals = attRes.data.data?.totals || {};
+      const onLeaveToday = leaveRes.data.data?.on_leave_today || [];
+      setTodayOverview({
+        present: Number(totals.present_days || 0),
+        late: Number(totals.late_days || 0),
+        absent: Number(totals.absent_days || 0),
+        onLeave: onLeaveToday.length,
+      });
+    } catch {
+      // overview strip is secondary
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTodayOverview();
+  }, [loadTodayOverview]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -418,6 +453,7 @@ function AdminAttendance({ user }) {
       }
       setModalOpen(false);
       loadData();
+      loadTodayOverview();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -438,6 +474,7 @@ function AdminAttendance({ user }) {
       );
       setAbsentOpen(false);
       loadData();
+      loadTodayOverview();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -453,6 +490,7 @@ function AdminAttendance({ user }) {
       toast.success(res.data.message || 'Attendance record deleted.');
       setDeleting(null);
       loadData();
+      loadTodayOverview();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -478,7 +516,58 @@ function AdminAttendance({ user }) {
         }
       />
 
-      {user?.employeeId && <TimeCard compact onChange={loadData} />}
+      {canClockIn(user?.role) && user?.employeeId ? (
+        <TimeCard compact onChange={loadData} />
+      ) : (
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title">
+              <CalendarClock size={17} /> Today&apos;s Overview
+            </div>
+            <span className="muted small">{longToday()}</span>
+          </div>
+          <div className="card-body">
+            <div className="row-wrap">
+              <div className="summary-chip">
+                <span className="dot-icon tone-success">
+                  <UserCheck size={18} />
+                </span>
+                <div>
+                  <strong>{todayOverview.present}</strong>
+                  <span>Present today</span>
+                </div>
+              </div>
+              <div className="summary-chip">
+                <span className="dot-icon tone-warning">
+                  <Clock size={18} />
+                </span>
+                <div>
+                  <strong>{todayOverview.late}</strong>
+                  <span>Late today</span>
+                </div>
+              </div>
+              <div className="summary-chip">
+                <span className="dot-icon tone-danger">
+                  <UserX size={18} />
+                </span>
+                <div>
+                  <strong>{todayOverview.absent}</strong>
+                  <span>Absent today</span>
+                </div>
+              </div>
+              <div className="summary-chip">
+                <span className="dot-icon tone-info">
+                  <Palmtree size={18} />
+                </span>
+                <div>
+                  <strong>{todayOverview.onLeave}</strong>
+                  <span>On leave today</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="row-wrap">
         <div className="summary-chip">
@@ -857,5 +946,5 @@ function AdminAttendance({ user }) {
 
 export default function Attendance() {
   const { user, isAdmin } = useAuth();
-  return isAdmin ? <AdminAttendance user={user} /> : <EmployeeAttendance />;
+  return isAdmin ? <AdminAttendance user={user} /> : <EmployeeAttendance user={user} />;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useOutlet } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
@@ -6,21 +6,15 @@ import Navbar from './Navbar';
 import PageTransition from './ui/PageTransition';
 import './Layout.css';
 
-const COLLAPSE_KEY = 'ems-sidebar-collapsed';
-
-/** Logged-in shell: Sidebar + Navbar + animated content area. */
+/** Logged-in shell: Slim Rail / Split-Panel Sidebar + Navbar + animated content area. */
 export default function Layout() {
   const location = useLocation();
   const outlet = useOutlet();
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const toggleCollapse = () => {
-    setCollapsed((c) => {
-      localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1');
-      return !c;
-    });
-  };
+  const handleCloseMobile = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -28,13 +22,8 @@ export default function Layout() {
   }, [location.pathname]);
 
   return (
-    <div className={`app-shell ${collapsed ? 'is-collapsed' : ''}`}>
-      <Sidebar
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapse}
-        mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
-      />
+    <div className="app-shell">
+      <Sidebar mobileOpen={mobileOpen} onCloseMobile={handleCloseMobile} />
       <div className="app-main">
         <Navbar onOpenMenu={() => setMobileOpen(true)} />
         <main className="app-content" id="main-content">

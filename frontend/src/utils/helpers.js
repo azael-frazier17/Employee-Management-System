@@ -183,3 +183,9 @@ export const cleanParams = (params) =>
 
 /** Formats a number with thousands separators. */
 export const formatNumber = (n) => Number(n || 0).toLocaleString('en-US');
+
+const NON_CLOCK_IN_ROLES = ['admin', 'hr', 'manager'];
+
+/** Returns true if the given user role is allowed to use personal clock-in/out. */
+export const canClockIn = (role) =>
+  Boolean(role) && !NON_CLOCK_IN_ROLES.includes(String(role).trim().toLowerCase());
